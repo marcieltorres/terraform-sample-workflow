@@ -35,3 +35,23 @@ override.tf.json
 # Ignore CLI configuration files
 .terraformrc
 terraform.rc
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+.DS_Store
+
+# Visual Studio Code
+.vscode
+
+# Secrets and credentials
+*.pem
+*.credentials
+
+.claude
