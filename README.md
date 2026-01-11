@@ -1,6 +1,6 @@
 # Terraform Sample Workflow
 
-A production-ready template demonstrating best practices for managing AWS infrastructure with Terraform and GitHub Actions. This project showcases multi-environment deployment workflows, automated CI/CD pipelines, and Infrastructure as Code (IaC) patterns. This repository serves as a learning resource and starting point for teams looking to implement robust Terraform workflows.
+A simple and practical template for managing AWS infrastructure with Terraform and GitHub Actions. This project demonstrates multi-environment deployment workflows, automated CI/CD pipelines, and Infrastructure as Code (IaC) patterns. This repository serves as a learning resource and starting point for teams looking to implement Terraform workflows.
 
 ## Features
 
