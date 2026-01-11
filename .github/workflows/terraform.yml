@@ -1,0 +1,144 @@
+name: Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+
+  pull_request:
+    paths:
+      - 'iac/terraform/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  terraform:
+    name: Terraform ${{ github.event.inputs.action || 'plan' }} - ${{ github.event.inputs.environment || 'dev' }}
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: iac/terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+
+      - name: Configure AWS Credentials (OIDC)
+        if: ${{ secrets.AWS_ROLE != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: us-east-1
+
+      - name: Configure AWS Credentials (Access Keys)
+        if: ${{ secrets.AWS_ROLE == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Set environment for PR
+        if: github.event_name == 'pull_request'
+        run: echo "TF_ENV=dev" >> $GITHUB_ENV
+
+      - name: Set environment for workflow_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "TF_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+
+      - name: Select Terraform Workspace
+        id: workspace
+        run: |
+          terraform workspace select ${{ env.TF_ENV }} || terraform workspace new ${{ env.TF_ENV }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -no-color -out=tfplan
+        continue-on-error: true
+
+      - name: Comment PR with Plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const planOutcome = '${{ steps.plan.outcome }}';
+            const statusIcon = planOutcome === 'success' ? '✅' : '❌';
+            const statusText = planOutcome === 'success' ? 'Success' : 'Failed';
+
+            const output = `## ${statusIcon} Terraform Plan ${statusText}
+
+            #### Terraform Initialization \`${{ steps.init.outcome }}\`
+            #### Terraform Workspace \`${{ steps.workspace.outcome }}\`
+            #### Terraform Validation \`${{ steps.validate.outcome }}\`
+            #### Terraform Format \`${{ steps.fmt.outcome }}\`
+            #### Terraform Plan \`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+
+            </details>
+
+            **Workspace:** \`${{ env.TF_ENV }}\`
+            **Pusher:** @${{ github.actor }}
+            **Action:** \`${{ github.event_name }}\``;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply' && github.event_name == 'workflow_dispatch'
+        id: apply
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Output
+        if: github.event.inputs.action == 'apply' && github.event_name == 'workflow_dispatch'
+        run: terraform output
