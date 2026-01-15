@@ -1,5 +1,9 @@
 name: Terraform
 
+concurrency:
+  group: terraform-${{ github.event.inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
     inputs:
