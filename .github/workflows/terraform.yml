@@ -1,4 +1,5 @@
 name: Terraform
+run-name: Terraform ${{ github.event.inputs.action || 'plan' }} [${{ github.event.inputs.environment || 'dev' }}] by @${{ github.actor }}
 
 concurrency:
   group: terraform-${{ github.event.inputs.environment || 'dev' }}
