@@ -1,0 +1,26 @@
+name: Test Scripts
+
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/**'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/scripts/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run unit tests
+        run: node --test .github/scripts
