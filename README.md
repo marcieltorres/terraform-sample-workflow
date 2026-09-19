@@ -10,6 +10,7 @@ A simple and practical template for managing AWS infrastructure with Terraform a
 - **Environment-Specific Configs**: Different retention policies and timeouts per environment
 - **State Management**: S3 backend with encryption and workspace isolation
 - **Code Quality**: Automated formatting checks and validation
+- **Visual Plan Summary**: Groups plan changes by create/update/replace/destroy/no-op with counts and highlights destructive changes, shown in the PR comment, the workflow's Job Summary tab, and the job log (as ANSI-colored text, since logs don't render Markdown)
 
 ## Installing Terraform CLI
 
@@ -143,7 +144,8 @@ When opening a Pull Request with changes to `iac/terraform/**`, the workflow aut
 - Checks Terraform file formatting
 - Validates file syntax
 - Runs `terraform plan` for the `dev` environment
-- Comments the result on the PR
+- Comments a grouped visual summary of the plan (not the raw plan text) on the PR
+- Writes the same summary to the workflow's Job Summary tab and the job log for every run, including `workflow_dispatch`, not just pull requests
 - Allows reviewing changes before merge
 
 ### Terraform Code Formatting

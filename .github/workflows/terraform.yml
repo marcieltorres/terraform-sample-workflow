@@ -97,43 +97,37 @@ jobs:
           terraform plan -no-color -out=tfplan
         continue-on-error: true
 
-      - name: Comment PR with Plan
-        if: github.event_name == 'pull_request'
+      - name: Terraform Plan JSON
+        id: plan_json
+        if: steps.plan.outcome == 'success'
+        run: terraform show -no-color -json tfplan > tfplan.json
+        continue-on-error: true
+
+      - name: Terraform Plan Report
+        if: always()
         uses: actions/github-script@v7
+        env:
+          INIT_OUTCOME: ${{ steps.init.outcome }}
+          WORKSPACE_OUTCOME: ${{ steps.workspace.outcome }}
+          FMT_OUTCOME: ${{ steps.fmt.outcome }}
+          VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
+          PLAN_OUTCOME: ${{ steps.plan.outcome }}
+          PLAN_OUTPUT: ${{ steps.plan.outputs.stdout }}
+          WORKING_DIR: iac/terraform
+          WORKSPACE: ${{ env.TF_ENV }}
+          PLAN_JSON_PATH: iac/terraform/tfplan.json
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('fs');
-            const planOutcome = '${{ steps.plan.outcome }}';
-            const statusIcon = planOutcome === 'success' ? '✅' : '❌';
-            const statusText = planOutcome === 'success' ? 'Success' : 'Failed';
+            const { buildReport, printLogSummary, writeJobSummary, commentPlan } = require(`${process.env.GITHUB_WORKSPACE}/.github/scripts/terraform-plan-summary.js`);
 
-            const output = `## ${statusIcon} Terraform Plan ${statusText}
+            const report = buildReport();
+            printLogSummary({ core }, report);
+            await writeJobSummary({ core }, report);
 
-            #### Terraform Initialization \`${{ steps.init.outcome }}\`
-            #### Terraform Workspace \`${{ steps.workspace.outcome }}\`
-            #### Terraform Validation \`${{ steps.validate.outcome }}\`
-            #### Terraform Format \`${{ steps.fmt.outcome }}\`
-            #### Terraform Plan \`${{ steps.plan.outcome }}\`
-
-            <details><summary>Show Plan</summary>
-
-            \`\`\`terraform
-            ${{ steps.plan.outputs.stdout }}
-            \`\`\`
-
-            </details>
-
-            **Workspace:** \`${{ env.TF_ENV }}\`
-            **Pusher:** @${{ github.actor }}
-            **Action:** \`${{ github.event_name }}\``;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: output
-            });
+            if (context.eventName === 'pull_request') {
+              await commentPlan({ github, context }, report);
+            }
 
       - name: Terraform Plan Status
         if: steps.plan.outcome == 'failure'
